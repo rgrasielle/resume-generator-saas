@@ -24,17 +24,28 @@ export async function POST(request: Request) {
       );
     }
 
-    const { email, password } = validation.data;
+    const email = validation.data.email.toLowerCase();
+    const password = validation.data.password;
 
     const existingUser = await prisma.user.findUnique({
       where: { email },
     });
 
     if (existingUser) {
+      if (!existingUser.password) {
+        return NextResponse.json(
+          {
+            success: false,
+            message: "Use o login com Google para acessar sua conta",
+          },
+          { status: 400 },
+        );
+      }
+
       return NextResponse.json(
         {
           success: false,
-          message: "Usuário já existe",
+          message: "Não foi possível criar a conta",
         },
         { status: 400 },
       );
@@ -42,7 +53,7 @@ export async function POST(request: Request) {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    await prisma.user.create({
+    const user = await prisma.user.create({
       data: {
         email,
         password: hashedPassword,
@@ -53,10 +64,16 @@ export async function POST(request: Request) {
       {
         success: true,
         message: "Usuário criado com sucesso",
+        data: {
+          id: user.id,
+          email: user.email,
+        },
       },
       { status: 201 },
     );
   } catch (error) {
+    console.error("Erro no registro:", error);
+
     return NextResponse.json(
       {
         success: false,
